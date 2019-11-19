@@ -312,7 +312,8 @@ class Dataset(data.Dataset):
                 back_img = np.array(self.trancolor(Image.open(back_frame).resize((640, 480), Image.ANTIALIAS)))
                 back_img = np.transpose(back_img, (2, 0, 1))
                 # choose_frame is path to image of same item of multiple frames
-                mask = (cv2.imread('{0}_mask.png'.format(choose_frame))[:, :, 0] == 255)
+                # mask = (cv2.imread('{0}_mask.png'.format(choose_frame))[:, :, 0] == 255)
+                mask = (cv2.imread('{0}/data/{1}_mask.png'.format(self.root, choose_frame))[:, :, 0] == 255)
                 img = np.transpose(np.array(img), (2, 0, 1))
 
                 img = img * (~mask) + back_img * mask
@@ -322,7 +323,8 @@ class Dataset(data.Dataset):
                 back_cate_id = random.sample([1, 2, 3, 4, 5, 6], 1)[0]
                 back_depth_choose_obj = random.sample(self.real_obj_name_list[back_cate_id], 1)[0]
                 back_choose_frame = random.sample(self.real_obj_list[back_cate_id][back_depth_choose_obj], 1)[0]
-                back_depth = np.array(self.load_depth('{0}_depth.png'.format(back_choose_frame)))
+                # back_depth = np.array(self.load_depth('{0}_depth.png'.format(back_choose_frame)))
+                back_depth = np.array(self.load_depth('{0}/data/{1}_depth.png'.format(self.root, back_choose_frame)))
 
                 ori_back_depth = back_depth * mask
                 ori_depth = depth * (~mask)
@@ -337,7 +339,8 @@ class Dataset(data.Dataset):
         else:
             img = np.array(img)
 
-        mask_target = (cv2.imread('{0}_mask.png'.format(choose_frame))[:, :, 2] == idx)[rmin:rmax, cmin:cmax]
+        # mask_target = (cv2.imread('{0}_mask.png'.format(choose_frame))[:, :, 2] == idx)[rmin:rmax, cmin:cmax]
+        mask_target = (cv2.imread('{0}/data/{1}_mask.png'.format(self.root, choose_frame))[:, :, 2] == idx)[rmin:rmax, cmin:cmax]
 
         choose = (mask_target.flatten() != False).nonzero()[0]
         if len(choose) == 0:
