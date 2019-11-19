@@ -1,0 +1,10 @@
+# TODO:                        
+# figure out what is model scales, is it bbox?
+
+# what is target * target pose? pose in next frame? looks more like in current frame
+# need to create model scales for each image pose (if put the tool in a way that its
+# always in camera, then still need to find a way to have model scale)
+# need to relate model scale with our item image in "multiple frames"
+# need to have depth and mask for each item in each frame, and properly linked
+# figure out what is choose and what is cloud
+# need to have a mesh file instead of sphere.xyz
