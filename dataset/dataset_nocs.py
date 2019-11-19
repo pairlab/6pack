@@ -18,35 +18,97 @@ import cv2
 
 class Dataset(data.Dataset):
     def __init__(self, mode, root, add_noise, num_pt, num_cates, count, cate_id):
+        # root directory
         self.root = root
+        # add noise
         self.add_noise = add_noise
+        # train
         self.mode = mode
+        # number of what points?
         self.num_pt = num_pt
+        # how many tool shapes
         self.num_cates = num_cates
+        # data_augment
         self.back_root = '{0}/train2017/'.format(self.root)
-
+        # load files for training
+        # tool shape id
         self.cate_id = cate_id
-
+        # dict { obj id -> obj? }
         self.obj_list = {}
+        # dict { obj id -> name? }
         self.obj_name_list = {}
 
+        # load obj_list {cate_id:[item1, item2, item3]}
+        # one item can have multiple frames, for our case, just 2 frames, from and to
+        # do we need to sample from the list? probably not -> no need to construct this list
+        # in get_item, just go through all the data we have
+        # do we need small delta of r and t for each step? no, just two frames, no tracking
+        # what's syn_or_real? we have syn, not sure about real
+        # load obj_name_list {cate_id:{item1:[file path 1, fp2], 2:[fp1, fp2]}}
         if self.mode == 'train':
             # {0} = "Mydata"
+            # load tool names for each cate_id
+            # eg. cate_id = a, obj_name_list {a:[1, 2, 3]}
+            # in our case
+            # obj_name_list = {1: ["X_shape_hammer", "L_shape_hammer", "T_shape_hammer"],
+            #                       2: [""]}
+            # obj_list = {1:{"X_shape_hammer"：["X_shape_hammer_1", "X_shape_hammer_2", "X_shape_hammer_3"],
+            #                  2:{"L_shape_hammer"：["L_shape_hammer_1", "L_shape_hammer_2", "L_shape_hammer_3"]}
             self.obj_name_list[cate_id] = os.listdir('{0}/{1}/'.format(self.root, cate_id))
             self.obj_list[cate_id] = {}
-
+            # for tool 1 ,2 ,3 in tool shape a
             for item in self.obj_name_list[cate_id]:
+                # tool shape a, tool 1
                 print(cate_id, item)
+                # {a:{1:[file path 1, file path2], 2:[file path1, file path2]}}
                 self.obj_list[cate_id][item] = []
+                # read from MyNOCS / data_list / train / temp_cate_id / list.txt
+                # My_NOCS\data_list\train\1\x_hammer1
+                input_file = open('{0}/{1}/{2}/list.txt'.format(self.root, cate_id, item), 'r')
+                while 1:
+                    input_line = input_file.readline()
+                    if not input_line:
+                        break
+                    if input_line[-1:] == '\n':
+                        input_line = input_line[:-1]
+                    # to put image of item in different frames in data folder as described in list.txt
+                    self.obj_list[cate_id][item].append('{0}/data/{1}'.format(self.root, input_line))
                 # item is tools of different shapes
                 # input_file = open('{0}/{1}/{2}/list.txt'.format(self.root, cate_id, item), 'r')
                 # self.obj_list[cate_id][item].append('{0}/data/{1}'.format(self.root, input_line))
-                # input_file.close()
-
+                input_file.close()
         self.real_obj_list = {}
         self.real_obj_name_list = {}
-
-
+        # cate_id = 1, 2, ..., num_cates
+        for cate_id in range(1, self.num_cates+1):
+            # {a: [path to file1, path to file2]}
+            # path is MyNOCS/data_list/real_train/a
+            # build a training set of
+            # cate_id = 1 (bottle), [bottle_blue_google_norm, bottle_starbuck_norm]
+            self.real_obj_name_list[cate_id] = os.listdir(
+                '{0}/data_list/real_{1}/{2}/'.format(self.root, self.mode, cate_id))
+            # real_obj_list
+            # {a:{1:[My_NOCS/data/]},
+            self.real_obj_list[cate_id] = {}
+            for item in self.real_obj_name_list[cate_id]:
+                print(cate_id, item)
+                self.real_obj_list[cate_id][item] = []
+                # path = MyNOCS/ data_list/real_train/ a/1/list.txt
+                # list contain images of the same item in different frames
+                input_file = open(
+                    '{0}/data_list/real_{1}/{2}/{3}/list.txt'.format(self.root, self.mode, cate_id, item), 'r')
+                while 1:
+                    input_line = input_file.readline()
+                    if not input_line:
+                        break
+                    if input_line[-1:] == '\n':
+                        input_line = input_line[:-1]
+                self.real_obj_list[cate_id][item].append('{0}/data/{1}'.format(self.root, input_line))
+            # in our case
+            # real_obj_name_list = {1: ["X_shape_hammer", "L_shape_hammer", "T_shape_hammer"],
+            #                       2: [""]}
+            # real_obj_list = {1:{"X_shape_hammer"：["X_shape_hammer_1", "X_shape_hammer_2", "X_shape_hammer_3"],
+            #                  2:{"L_shape_hammer"：["L_shape_hammer_1", "L_shape_hammer_2", "L_shape_hammer_3"]}
 
         self.back_list = []
 
@@ -184,7 +246,7 @@ class Dataset(data.Dataset):
 
         img = Image.open('{0}_pose.png'.format(choose_frame))
         depth = np.array(self.load_depth('{0}_depth.png'.format(choose_frame)))
-
+        # get the pose H from pose.txt
         target_r, target_t, idx = self.get_pose(choose_frame, choose_obj)
 
         cam_cx = self.cam_cx_1
@@ -193,6 +255,21 @@ class Dataset(data.Dataset):
         cam_fy = self.cam_fy_1
         cam_scale = 1.0
 
+        # current idea:
+        # for each item in tool category, we have multiple frames in the following structure,
+        # right now, we just have frame fr and to
+        # generate depth and mask for fr and to
+        # this gives us a pair of info which can then be feed into model and get score feedback to train kp generator
+        # although kpt generator generates kpts aimming to track obj through multiview loss
+        # it will still get updated by Q loss
+        # TODO: figure out what is model scales, is it bbox?
+        #                      what is target * target pose? pose in next frame? looks more like in current frame
+        #                      need to create model scales for each image pose (if put the tool in a way that its
+        #                      always in camera, then still need to find a way to have model scale)
+        #                      need to relate model scale with our item image in "multiple frames"
+        #                      need to have depth and mask for each item in each frame, and properly linked
+        #                      figure out what is choose and what is cloud
+        #                      need to have a mesh file
         target = []
         input_file = open('{0}/model_scales/{1}.txt'.format(self.root, choose_obj), 'r')
         for i in range(8):
@@ -203,19 +280,27 @@ class Dataset(data.Dataset):
             target.append([float(input_line[0]), float(input_line[1]), float(input_line[2])])
         input_file.close()
         target = np.array(target)
-
+        # put the target into a unit cube box and enlarge it to 1.3
         target = self.enlarge_bbox(copy.deepcopy(target))
 
-        # delta = math.pi / 10.0
-        # noise_trans = 0.05
+        # make small disturbance
+        delta = math.pi / 10.0
+        noise_trans = 0.05
+        # sample a small disturbance for point cloud
         r = euler_matrix(random.uniform(-delta, delta), random.uniform(-delta, delta), random.uniform(-delta, delta))[:3, :3]
+        # why noise * 1000?
         t = np.array([random.uniform(-noise_trans, noise_trans) for i in range(3)]) * 1000.0
 
+        # disturb the target (3d bbox) by noise
         target_tmp = target - (np.array([random.uniform(-noise_trans, noise_trans) for i in range(3)]) * 3000.0)
+        # apply the transform acquired from: target_r, target_t, idx = self.get_pose(choose_frame, choose_obj)
         target_tmp = np.dot(target_tmp, target_r.T) + target_t
+        # make first line and second line negative to place it at origin?
         target_tmp[:, 0] *= -1.0
         target_tmp[:, 1] *= -1.0
+        # get 2d bbox in pixel coordinates from transformed target(3d bbox)
         rmin, rmax, cmin, cmax = get_2dbbox(target_tmp, cam_cx, cam_cy, cam_fx, cam_fy, cam_scale)
+        # find the max length
         limit = search_fit(target)
 
         if self.add_noise:
@@ -226,7 +311,7 @@ class Dataset(data.Dataset):
 
                 back_img = np.array(self.trancolor(Image.open(back_frame).resize((640, 480), Image.ANTIALIAS)))
                 back_img = np.transpose(back_img, (2, 0, 1))
-
+                # choose_frame is path to image of same item of multiple frames
                 mask = (cv2.imread('{0}_mask.png'.format(choose_frame))[:, :, 0] == 255)
                 img = np.transpose(np.array(img), (2, 0, 1))
 
@@ -316,22 +401,67 @@ class Dataset(data.Dataset):
 
 
     def __getitem__(self, index):
-        # if self.mode == 'val':
-        syn_or_real = False
+        # in our case, we dont have real obj now
+        # 75% true, use real, 25% false, use syn
+        # syn_or_real = (random.randint(1, 20) < 15)
+        # if val, false, use real obj
+        if self.mode == 'val':
+            syn_or_real = False
 
-        while 1:
-            try:
-                choose_obj = random.sample(self.real_obj_name_list[self.cate_id], 1)[0]
-                choose_frame = random.sample(self.real_obj_list[self.cate_id][choose_obj], 2)
+        if self.mode == 'train':
+            syn_or_real = True
 
-                img_fr, choose_fr, cloud_fr, r_fr, t_fr, target, _ = self.get_frame(choose_frame[0], choose_obj, syn_or_real)
-                img_to, choose_to, cloud_to, r_to, t_to, target, _ = self.get_frame(choose_frame[1], choose_obj, syn_or_real)
-                if np.max(abs(target)) > 1.0:
+        if syn_or_real:
+            while 1:
+                try:
+                    choose_obj = random.sample(self.obj_name_list[self.cate_id], 1)[0]
+                    # can still use 2 if there are only 2
+                    choose_frame = random.sample(self.obj_list[self.cate_id][choose_obj], 2)
+                    img_fr, choose_fr, cloud_fr, r_fr, t_fr, target_fr, mesh_pts_fr, mesh_bbox_fr, mask_target = self.get_frame(
+                        choose_frame[0], choose_obj, syn_or_real)
+                    if np.max(abs(target_fr)) > 1.0:
+                        continue
+                    img_to, choose_to, cloud_to, r_to, t_to, target_to, _, _, _, = self.get_frame(choose_frame[1],
+                                                                                                  choose_obj,
+                                                                                                  syn_or_real)
+                    if np.max(abs(target_to)) > 1.0:
+                        continue
+                    target, scale_factor = self.re_scale(target_fr, target_to)
+                    target_mesh_fr, scale_factor_mesh_fr = self.re_scale(target_fr, mesh_bbox_fr)
+                    cloud_to = cloud_to * scale_factor
+                    # why this mech is not used?
+                    mesh = mesh_pts_fr * scale_factor_mesh_fr
+                    t_to = t_to * scale_factor
+                    break
+                except:
                     continue
-                break
-            except:
-                continue
 
+        else:
+            while 1:
+                try:
+                    # randomly choose a frame, might not be consecutive, could be a huge time gap
+                    # change to our fr and to
+                    # nothing to be sample from
+                    # choose_obj is an item from category cate_id
+                    choose_obj = random.sample(self.real_obj_name_list[self.cate_id], 1)[0]
+                    ###choose_frame = random.sample(self.real_obj_list[self.cate_id][choose_obj], 2)
+                    # could be more in the future, need path
+                    choose_frame = self.real_obj_list[self.cate_id][choose_obj]
+                    choose_frame = [, "to"]
+                    # img_fr: the start image
+                    # choose_fr: mask if nonzero
+                    # cloud_fr: point clound
+                    # r_fr: small rotational disturbance
+                    # t_fr: small translational disturbance
+                    # target: 3d bbox
+                    img_fr, choose_fr, cloud_fr, r_fr, t_fr, target, _ = self.get_frame(choose_frame[0], choose_obj, syn_or_real)
+                    img_to, choose_to, cloud_to, r_to, t_to, target, _ = self.get_frame(choose_frame[1], choose_obj, syn_or_real)
+                    if np.max(abs(target)) > 1.0:
+                        continue
+                    break
+                except:
+                    continue
+        # save information
         if False:
             p_img = np.transpose(img_fr, (1, 2, 0))
             scipy.misc.imsave('temp/{0}_img_fr.png'.format(index), p_img)
