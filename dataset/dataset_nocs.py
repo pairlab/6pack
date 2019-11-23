@@ -52,8 +52,8 @@ class Dataset(data.Dataset):
             # in our case
             # obj_name_list = {1: ["X_shape_hammer", "L_shape_hammer", "T_shape_hammer"],
             #                       2: [""]}
-            # obj_list = {1:{"X_shape_hammer"：["X_shape_hammer_1", "X_shape_hammer_2", "X_shape_hammer_3"],
-            #                  2:{"L_shape_hammer"：["L_shape_hammer_1", "L_shape_hammer_2", "L_shape_hammer_3"]}
+            # obj_list = {1:{"X_shape_hammer":["X_shape_hammer_1", "X_shape_hammer_2", "X_shape_hammer_3"],
+            #                  2:{"L_shape_hammer":["L_shape_hammer_1", "L_shape_hammer_2", "L_shape_hammer_3"]}
             self.obj_name_list[cate_id] = os.listdir('{0}/{1}/'.format(self.root, cate_id))
             self.obj_list[cate_id] = {}
             # for tool 1 ,2 ,3 in tool shape a
@@ -107,8 +107,8 @@ class Dataset(data.Dataset):
             # in our case
             # real_obj_name_list = {1: ["X_shape_hammer", "L_shape_hammer", "T_shape_hammer"],
             #                       2: [""]}
-            # real_obj_list = {1:{"X_shape_hammer"：["X_shape_hammer_1", "X_shape_hammer_2", "X_shape_hammer_3"],
-            #                  2:{"L_shape_hammer"：["L_shape_hammer_1", "L_shape_hammer_2", "L_shape_hammer_3"]}
+            # real_obj_list = {1:{"X_shape_hammer":["X_shape_hammer_1", "X_shape_hammer_2", "X_shape_hammer_3"],
+            #                  2:{"L_shape_hammer":["L_shape_hammer_1", "L_shape_hammer_2", "L_shape_hammer_3"]}
 
         self.back_list = []
 
@@ -313,7 +313,8 @@ class Dataset(data.Dataset):
                 back_img = np.transpose(back_img, (2, 0, 1))
                 # choose_frame is path to image of same item of multiple frames
                 # mask = (cv2.imread('{0}_mask.png'.format(choose_frame))[:, :, 0] == 255)
-                mask = (cv2.imread('{0}/data/{1}_mask.png'.format(self.root, choose_frame))[:, :, 0] == 255)
+                # mask = (cv2.imread('{0}/data/{1}_mask.png'.format(self.root, choose_frame))[:, :, 0] == 255)
+                mask = (depth < 1)
                 img = np.transpose(np.array(img), (2, 0, 1))
 
                 img = img * (~mask) + back_img * mask
@@ -324,7 +325,8 @@ class Dataset(data.Dataset):
                 back_depth_choose_obj = random.sample(self.real_obj_name_list[back_cate_id], 1)[0]
                 back_choose_frame = random.sample(self.real_obj_list[back_cate_id][back_depth_choose_obj], 1)[0]
                 # back_depth = np.array(self.load_depth('{0}_depth.png'.format(back_choose_frame)))
-                back_depth = np.array(self.load_depth('{0}/data/{1}_depth.png'.format(self.root, back_choose_frame)))
+                back_depth = np.array(self.load_depth('{0}/data/{1}/depth.png'.format(self.root, back_choose_frame)))
+                # depth = back_depth
 
                 ori_back_depth = back_depth * mask
                 ori_depth = depth * (~mask)
@@ -340,8 +342,8 @@ class Dataset(data.Dataset):
             img = np.array(img)
 
         # mask_target = (cv2.imread('{0}_mask.png'.format(choose_frame))[:, :, 2] == idx)[rmin:rmax, cmin:cmax]
-        mask_target = (cv2.imread('{0}/data/{1}_mask.png'.format(self.root, choose_frame))[:, :, 2] == idx)[rmin:rmax, cmin:cmax]
-
+        # mask_target = (cv2.imread('{0}/data/{1}_mask.png'.format(self.root, choose_frame))[:, :, 2] == idx)[rmin:rmax, cmin:cmax]
+        mask_target = depth
         choose = (mask_target.flatten() != False).nonzero()[0]
         if len(choose) == 0:
             return 0
@@ -447,10 +449,9 @@ class Dataset(data.Dataset):
                     # nothing to be sample from
                     # choose_obj is an item from category cate_id
                     choose_obj = random.sample(self.real_obj_name_list[self.cate_id], 1)[0]
-                    ###choose_frame = random.sample(self.real_obj_list[self.cate_id][choose_obj], 2)
+                    choose_frame = random.sample(self.real_obj_list[self.cate_id][choose_obj], 2)
                     # could be more in the future, need path
-                    choose_frame = self.real_obj_list[self.cate_id][choose_obj]
-                    choose_frame = [, "to"]
+                    # choose_frame = self.real_obj_list[self.cate_id][choose_obj]
                     # img_fr: the start image
                     # choose_fr: mask if nonzero
                     # cloud_fr: point clound

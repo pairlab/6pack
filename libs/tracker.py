@@ -15,7 +15,7 @@ import torchvision.utils as vutils
 from torch.autograd import Variable
 from dataset.inference_dataset_nocs import Dataset
 from libs.network import KeyNet
-from libs.loss import Loss
+# from libs.loss import Loss
 import copy
 
 
@@ -38,11 +38,11 @@ class tracker():
 
         self.model = KeyNet(num_points = self.num_points, num_key = self.num_kp, num_cates = self.num_cates)
         self.model.cuda()
-        self.model.load_state_dict(torch.load('{0}/{1}'.format(self.outf, self.resume_models[choose_cate-1])))
+        # self.model.load_state_dict(torch.load('{0}/{1}'.format(self.outf, self.resume_models[choose_cate-1])))
         self.model.eval()
 
         self.dataprocess = Dataset(self.num_points)
-        self.criterion = Loss(self.num_kp, self.num_cates)
+        # self.criterion = Loss(self.num_kp, self.num_cates)
 
         self.temp_dir = []
         for temp_ite in range(self.temp_gap):
@@ -53,34 +53,34 @@ class tracker():
 
 
     def init_estimation(self, rgb_dir, depth_dir, current_r, current_t, bbox):
-        for temp_ite in range(self.temp_gap):
-            self.temp_dir.append(np.array([0.0, 0.0, 0.0]))
-        while len(self.temp_dir) > self.temp_gap:
-            del self.temp_dir[0]
+        # for temp_ite in range(self.temp_gap):
+        #     self.temp_dir.append(np.array([0.0, 0.0, 0.0]))
+        # while len(self.temp_dir) > self.temp_gap:
+        #     del self.temp_dir[0]
 
         # print(rgb_dir, depth_dir)
         self.dataprocess.add_bbox(bbox)
 
-        if self.first_ite != 0:
-            min_dis = 1000.0
-            for iterative in range(self.first_ite):  
-                img_fr, choose_fr, cloud_fr, anchor, scale = self.dataprocess.getone(rgb_dir, depth_dir, current_r, current_t)
-                img_fr, choose_fr, cloud_fr, anchor, scale = Variable(img_fr).cuda(), \
-                                                             Variable(choose_fr).cuda(), \
-                                                             Variable(cloud_fr).cuda(), \
-                                                             Variable(anchor).cuda(), \
-                                                             Variable(scale).cuda()
-                Kp_fr, _ = self.model.eval_forward(img_fr, choose_fr, cloud_fr, anchor, scale, 0.0, True)
-                new_t, kp_dis = self.criterion.inf_zero(Kp_fr[0])
+        # if self.first_ite != 0:
+        #     min_dis = 1000.0
+        #     for iterative in range(self.first_ite):
+        #         img_fr, choose_fr, cloud_fr, anchor, scale = self.dataprocess.getone(rgb_dir, depth_dir, current_r, current_t)
+        #         img_fr, choose_fr, cloud_fr, anchor, scale = Variable(img_fr).cuda(), \
+        #                                                      Variable(choose_fr).cuda(), \
+        #                                                      Variable(cloud_fr).cuda(), \
+        #                                                      Variable(anchor).cuda(), \
+        #                                                      Variable(scale).cuda()
+        #         Kp_fr, _ = self.model.eval_forward(img_fr, choose_fr, cloud_fr, anchor, scale, 0.0, True)
+        #         new_t, kp_dis = self.criterion.inf_zero(Kp_fr[0])
 
-                if min_dis > kp_dis:
-                    min_dis = kp_dis
-                    best_current_r = copy.deepcopy(current_r)
-                    best_current_t = copy.deepcopy(current_t)
-                    print(min_dis)
-
-                current_t = current_t + np.dot(new_t, current_r.T)
-            current_r, current_t = best_current_r, best_current_t
+            #     if min_dis > kp_dis:
+            #         min_dis = kp_dis
+            #         best_current_r = copy.deepcopy(current_r)
+            #         best_current_t = copy.deepcopy(current_t)
+            #         print(min_dis)
+            #
+            #     current_t = current_t + np.dot(new_t, current_r.T)
+            # current_r, current_t = best_current_r, best_current_t
 
         img_fr, choose_fr, cloud_fr, anchor, scale = self.dataprocess.getone(rgb_dir, depth_dir, current_r, current_t)
         img_fr, choose_fr, cloud_fr, anchor, scale = Variable(img_fr).cuda(), \
@@ -92,10 +92,10 @@ class tracker():
 
         self.Kp_fr = Kp_fr[0]
 
-        self.dataprocess.projection(rgb_dir, current_r, current_t)
+        # self.dataprocess.projection(rgb_dir, current_r, current_t)
         print("NEXT!!!")
 
-        return current_r, current_t
+        return Kp_fr
 
     def next_estimation(self, rgb_dir, depth_dir, current_r, current_t):
         img_fr, choose_fr, cloud_fr, anchor, scale = self.dataprocess.getone(rgb_dir, depth_dir, current_r, current_t)

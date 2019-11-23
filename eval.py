@@ -68,6 +68,7 @@ for choose_cate in choose_cate_list:
 
         try:
             current_r, current_t = test_dataset.getfirst(choose_obj, choose_video)
+            # add translational error of 4 cm (+- 0.02mm)
             rad_t = np.array([random.uniform(-0.02, 0.02) for i in range(3)]) * 1000.0
             current_t += rad_t
 

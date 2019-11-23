@@ -3,7 +3,7 @@ import os.path
 import torch
 import numpy as np
 import torchvision.transforms as transforms
-from transformations import euler_matrix
+from libs.transformations import euler_matrix
 from torch.autograd import Variable
 import argparse
 import time
@@ -18,12 +18,15 @@ from PIL import Image
 
 class Dataset():
     def __init__(self, num_pts):
+        height = 255
+        width = 255
+        fovy = 45
+        f =  0.5 * height / math.tan(fovy * math.pi/360)
         self.num_pts = num_pts
-
-        self.cam_cx = 321.24099379
-        self.cam_cy = 237.11014479
-        self.cam_fx = 537.99040688
-        self.cam_fy = 539.09122804
+        self.cam_cx = width/2
+        self.cam_cy = height/2
+        self.cam_fx = f
+        self.cam_fy = f
         self.cam_scale = 1.0
 
         self.xmap = np.array([[j for i in range(640)] for j in range(480)])
@@ -121,7 +124,7 @@ class Dataset():
 
     def getone(self, img_dir, depth_dir, current_r, current_t):
         img = Image.open(img_dir)
-        depth = np.load(depth_dir)
+        depth = Image.open(depth_dir)
 
         target_r = current_r
         target_t = current_t
@@ -141,9 +144,11 @@ class Dataset():
         rmin, rmax, cmin, cmax = get_2dbbox(target_tmp, cam_cx, cam_cy, cam_fx, cam_fy, cam_scale)
         limit = search_fit(target)
 
+        # rmin, rmax, cmin, cmax =
         img = np.transpose(np.array(img)[:, :, :3], (2, 0, 1))[:, rmin:rmax, cmin:cmax]
         img = img / 255.0
 
+        depth = np.array(depth)
         depth = depth[rmin:rmax, cmin:cmax]
         choose = (depth.flatten() > -10000.0).nonzero()[0]
 

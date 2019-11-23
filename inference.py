@@ -18,11 +18,11 @@ from libs.tracker import tracker
 import math
 
 #start and end frame
-st = 
-ed = 
+st = 'fr'
+ed = 'to'
 
 # category id
-category_id = 
+category_id = 1
 tracker = tracker(category_id)
 
 # provide the initial pose and scale of the object
@@ -32,7 +32,7 @@ img_dir = 'rgb/{0}.png'.format(st)
 depth_dir = 'depth/{0}.npy'.format(st)
 current_r, current_t = tracker.init_estimation(img_dir, depth_dir, current_r, current_t, bbox)
 
-for i in range(st+1, ed):
-    img_dir = 'rgb/{0}.png'.format(i)
-    depth_dir = 'depth/{0}.npy'.format(i)
-    current_r, current_t = tracker.next_estimation(img_dir, depth_dir, current_r, current_t)
+# for i in range(st+1, ed):
+#     img_dir = 'rgb/{0}.png'.format(i)
+#     depth_dir = 'depth/{0}.npy'.format(i)
+#     current_r, current_t = tracker.next_estimation(img_dir, depth_dir, current_r, current_t)

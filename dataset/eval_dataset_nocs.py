@@ -123,15 +123,18 @@ class Dataset():
 
 
     def enlarge_bbox(self, target):
-
+        # find max and min x y z coordinates
         limit = np.array(search_fit(target))
+        # find the longest
         longest = max(limit[1]-limit[0], limit[3]-limit[2], limit[5]-limit[4])
+        # make it 1.3
         longest = longest * 1.3
-
+        # longest is 1.3, and others less than 1.3
         scale1 = longest / (limit[1]-limit[0])
         scale2 = longest / (limit[3]-limit[2])
         scale3 = longest / (limit[5]-limit[4])
 
+        # enlarge by this ratio
         target[:, 0] *= scale1
         target[:, 1] *= scale2
         target[:, 2] *= scale3
@@ -146,51 +149,83 @@ class Dataset():
             depth16 = depth16.astype(np.uint16)
         elif len(depth.shape) == 2 and depth.dtype == 'uint16':
             depth16 = depth
+        elif len(depth.shape) == 2 and depth.dtype == 'uint8':
+            depth16 = depth
         else:
+            print(len(depth.shape), depth.dtype)
             assert False, '[ Error ]: Unsupported depth type.'
 
         return depth16
 
-    def get_pose(self, choose_frame, choose_obj):
-        has_pose = []
-        pose = {}
-        with open('{0}/data/gts/real_test/results_real_test_{1}_{2}.pkl'.format(self.root, choose_frame.split("/")[-2], choose_frame.split("/")[-1]), 'rb') as f:
-            nocs_data = cPickle.load(f)
-        for idx in range(nocs_data['gt_RTs'].shape[0]):
-            idx = idx + 1
-            pose[idx] = nocs_data['gt_RTs'][idx-1]
-            pose[idx][:3, :3] = pose[idx][:3, :3] / np.cbrt(np.linalg.det(pose[idx][:3, :3]))
-            z_180_RT = np.zeros((4, 4), dtype=np.float32)
-            z_180_RT[:3, :3] = np.diag([-1, -1, 1])
-            z_180_RT[3, 3] = 1
-            pose[idx] = z_180_RT @ pose[idx]
-            pose[idx][:3,3] = pose[idx][:3,3] * 1000
-
-        input_file = open('{0}_meta.txt'.format(choose_frame), 'r')
+    def get_pose_nxu(self, choose_frame, choose_obj):
+        f = open('{0}/data/{1}/{2}/pose.txt'.format(self.root, choose_frame, choose_obj))
         while 1:
-            input_line = input_file.readline()
-            if not input_line:
-                break
-            if input_line[-1:] == '\n':
-                input_line = input_line[:-1]
-            input_line = input_line.split(' ')
-            if input_line[-1] == choose_obj:
-                ans = pose[int(input_line[0])]
-                ans_idx = int(input_line[0])
-                break
-        input_file.close()
-
-        ans = np.array(ans)
+            readline = f.readline()
+            ans = np.array(ans)
         ans_r = ans[:3, :3]
         ans_t = ans[:3, 3].flatten()
 
         return ans_r, ans_t, ans_idx
 
+    def get_pose(self, choose_frame, choose_obj):
+        has_pose = []
+        # pose = {}
+        # with open('{0}/data/gts/real_test/results_real_test_{1}_{2}.pkl'.format(self.root, choose_frame.split("/")[-2], choose_frame.split("/")[-1]), 'rb') as f:
+        #     nocs_data = cPickle.load(f)
+        # for idx in range(nocs_data['gt_RTs'].shape[0]):
+        #     idx = idx + 1
+        #     pose[idx] = nocs_data['gt_RTs'][idx-1]
+        #     pose[idx][:3, :3] = pose[idx][:3, :3] / np.cbrt(np.linalg.det(pose[idx][:3, :3]))
+        #     z_180_RT = np.zeros((4, 4), dtype=np.float32)
+        #     z_180_RT[:3, :3] = np.diag([-1, -1, 1])
+        #     z_180_RT[3, 3] = 1
+        #     pose[idx] = z_180_RT @ pose[idx]
+        #     pose[idx][:3,3] = pose[idx][:3,3] * 1000
+        #
+        # input_file = open('{0}_meta.txt'.format(choose_frame), 'r')
+        # while 1:
+        #     input_line = input_file.readline()
+        #     if not input_line:
+        #         break
+        #     if input_line[-1:] == '\n':
+        #         input_line = input_line[:-1]
+        #     input_line = input_line.split(' ')
+        #     if input_line[-1] == choose_obj:
+        #         ans = pose[int(input_line[0])]
+        #         ans_idx = int(input_line[0])
+        #         break
+        pose = {}
+        print("choose frame:", choose_frame)
+        print("choose obj:", choose_obj)
+        input_file = open('{0}/{1}/pose.txt'.format(choose_frame, choose_obj), 'r')
+        pose[choose_obj] = []
+        for i in range(4):
+            input_line = input_file.readline()
+            # print(input_line)
+            if input_line[-1:] == '\n':
+                input_line = input_line[:-1]
+            input_line = input_line.split(' ')
+            pose[choose_obj].append(
+                [float(input_line[0]), float(input_line[1]), float(input_line[2])])
+        ans = pose[choose_obj]
+        print(ans)
+        ans = np.array(ans)
+        ans_r = ans[-3:, :]
+        ans_t = ans[0, :].flatten()
+        input_file.close()
+        ans_idx = choose_obj
+        input_file.close()
+        print(ans_r.shape, ans_t.shape)
+        return ans_r, ans_t, ans_idx
+
 
     def get_frame(self, choose_frame, choose_obj, syn_or_real, current_r, current_t):
-        img = Image.open('{0}_pose.png'.format(choose_frame))
-        depth = np.array(self.load_depth('{0}_depth.png'.format(choose_frame)))
-
+        img = Image.open('{0}/pose.png'.format(choose_frame))
+        print("img:", np.transpose(np.array(img)[:, :, :3], (2, 0, 1)).shape)
+        print(np.transpose(np.array(img)[:, :, :3], (2, 0, 1))[:, 0:-180, 0:-180].shape)
+        depth = np.array(self.load_depth('{0}/depth.png'.format(choose_frame)), dtype=np.uint16)
+        print('{0}/depth.png'.format(choose_frame))
+        print("depth:", depth, depth.shape)
         if syn_or_real:
             cam_cx = self.cam_cx_1
             cam_cy = self.cam_cy_1
@@ -205,19 +240,26 @@ class Dataset():
 
         target = []
         # choose {}
-        input_file = open('{0}/{1}/{2}.txt'.format(self.root, choose_frame, choose_obj), 'r')
+        input_file = open('{0}/model_scales/{1}.txt'.format(self.root, choose_obj), 'r')
         for i in range(8):
             input_line = input_file.readline()
             if input_line[-1:] == '\n':
                 input_line = input_line[:-1]
             input_line = input_line.split(' ')
-            target.append([float(input_line[0]), float(input_line[1]), float(input_line[2])])
+            print(input_line)
+            if len(input_line) == 3:
+                print(len(input_line))
+                target.append([float(input_line[0]), float(input_line[1]), float(input_line[2])])
         input_file.close()
         target = np.array(target)
 
+        # enlarged bbox in 3D
         target = self.enlarge_bbox(copy.deepcopy(target))
-
+        print("target:", target.shape, target)
+        # 2 by 3
         target_tmp = np.dot(target, current_r.T) + current_t
+        print(target_tmp)
+        # make x and y negative
         target_tmp[:, 0] *= -1.0
         target_tmp[:, 1] *= -1.0
         rmin, rmax, cmin, cmax = get_2dbbox(target_tmp, cam_cx, cam_cy, cam_fx, cam_fy, cam_scale)
@@ -225,9 +267,10 @@ class Dataset():
 
         img = np.transpose(np.array(img)[:, :, :3], (2, 0, 1))[:, rmin:rmax, cmin:cmax]
         img = img / 255.0
-
+        print("img", np.transpose(np.array(img)[:, :, :3], (2, 0, 1)).shape)
+        print("rmin: rmax, cmin: cmax", rmin,rmax, cmin,cmax)
         depth = depth[rmin:rmax, cmin:cmax]
-
+        print(depth)
         choose = (depth.flatten() > -10000.0).nonzero()[0]
 
         depth_masked = depth.flatten()[choose][:, np.newaxis].astype(np.float32)
@@ -287,12 +330,13 @@ class Dataset():
         for it in split_name:
             if it[:5] == 'scene':
                 video_name = it
+        video_name = ""
 
         print(video_name, self.choose_obj, self.index)
 
-        if video_name != self.video_id:
-            print(video_name, self.video_id)
-            return 0
+        # if video_name != self.video_id:
+        #     print(video_name, self.video_id)
+        #     return 0
 
         img_fr, choose_fr, cloud_fr, target = self.get_frame(choose_frame, choose_obj, False, current_r, current_t)
 
@@ -455,9 +499,13 @@ def get_2dbbox(cloud, cam_cx, cam_cy, cam_fx, cam_fy, cam_scale):
     rmax = -10000
     cmin = 10000
     cmax = -10000
+    print("cloud", cloud)
     for tg in cloud:
         p1 = int(tg[0] * cam_fx / tg[2] + cam_cx)
         p0 = int(tg[1] * cam_fy / tg[2] + cam_cy)
+        print(cam_fx, cam_cx, cam_fy, cam_cy)
+        print(tg)
+        print("p0, p1:", p0, p1)
         if p0 < rmin:
             rmin = p0
         if p0 > rmax:
